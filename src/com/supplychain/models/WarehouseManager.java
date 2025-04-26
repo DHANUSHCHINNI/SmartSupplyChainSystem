@@ -21,6 +21,7 @@ public class WarehouseManager extends User{
     private List<Product> products;
     public HashMap<String, Integer> quantityMap; //code, quantity
     private Map<String, Double> priceMap;
+    private HashMap<String, List<Integer>> demandHistory;
     public WarehouseManager(List<Supplier> suppliers, int minOrderQty, List<Product> products){
         inventoryService=new InventoryService(this);
         inventoryService.start();
@@ -30,6 +31,7 @@ public class WarehouseManager extends User{
         this.quantityMap = new HashMap<>();
         this.priceMap = new HashMap<>();
         Random r=new Random();
+        this.demandHistory=new HashMap<String, List<Integer>>();
     }
     public List<Product> getProducts() {
         return products;
@@ -75,12 +77,23 @@ public class WarehouseManager extends User{
 
             // Create the order (this also handles sleep and shipment.log updates)
             Order order = new Order(bestSupplier,this);
+
             ShipmentTrackerThread shipmentTracker= new ShipmentTrackerThread(order.getOrderID(), 2, order);
             shipmentTracker.start();
-            order.process();
+//            order.process();
+            new Thread(() -> {
+                try {
+                    System.out.println("[ORDER THREAD] Order of " + product.getName() + " placed with Order ID:" +  order.getOrderID());
+                    order.process();
+                } catch (InterruptedException e) {
+                    System.err.println("Order for " + product.getCode() + " interrupted.");
+                }
+            }).start();
+
 
         } catch (InterruptedException e) {
             System.err.println("Order for " + code + " interrupted.");
+            e.printStackTrace();  // helpful for debugging
             return;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -94,9 +107,13 @@ public class WarehouseManager extends User{
         String code = product.getCode();
         int currentQty = quantityMap.getOrDefault(code, 0);
 
+
         if (currentQty < qty) {
             throw new InsufficientStockException("Not enough stock for product: " + code);
         }
+        demandHistory.putIfAbsent(code, new ArrayList<>());
+        List<Integer> productHistory = demandHistory.get(code);
+        productHistory.add(qty);
 
         quantityMap.put(code, currentQty - qty);
     }
@@ -123,6 +140,9 @@ public class WarehouseManager extends User{
         return priceMap.getOrDefault(productCode, Double.MAX_VALUE);
     }
 
+    public HashMap<String, List<Integer>> getDemandHistory(){
+        return this.demandHistory;
+    }
    
 
 }
