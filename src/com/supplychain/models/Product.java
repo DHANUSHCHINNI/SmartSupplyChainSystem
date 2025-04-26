@@ -16,6 +16,19 @@ public class Product {
         this.name = name;
     }
 
+    public Product(String barcodeData){
+        //with the assumption that barcodeData will be of the form "CODE-NAME-CATEGORY"
+        try {
+            String[] parts = barcodeData.split("-");
+            if (parts.length != 3) throw new IllegalArgumentException("Invalid barcode format");
+            this.code = parts[0]; 
+            this.name = parts[1]; 
+            this.category = parts[2]; 
+    } catch (Exception e) {
+        throw new IllegalArgumentException("Failed to parse barcode: " + barcodeData, e);
+    }
+    }
+
     public String getCode() {
         return code;
     }
