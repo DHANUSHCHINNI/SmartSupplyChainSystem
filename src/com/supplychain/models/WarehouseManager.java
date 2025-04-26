@@ -20,7 +20,7 @@ public class WarehouseManager extends User{
     private int MAX_QUANTITY;
     private List<Product> products;
     public HashMap<String, Integer> quantityMap; //code, quantity
-    private final Map<String, Double> priceMap; 
+    private Map<String, Double> priceMap;
     public WarehouseManager(List<Supplier> suppliers, int minOrderQty, List<Product> products){
         inventoryService=new InventoryService(this);
         inventoryService.start();
