@@ -4,6 +4,8 @@ import com.supplychain.models.Product;
 import com.supplychain.models.WarehouseManager;
 
 import java.util.List;
+import java.util.HashMap;
+
 
 public class InventoryService extends Thread {
     private final WarehouseManager warehouseManager;
@@ -28,6 +30,8 @@ public class InventoryService extends Thread {
             try {
                 // Check if products list is null or empty
                 List<Product> products = warehouseManager.getProducts();
+                System.out.println("Quantity for products "+ warehouseManager.quantityMap);
+
                 if (products == null || products.isEmpty()) {
                     System.out.println("[InventoryService] No products to monitor. Waiting for products...");
                     Thread.sleep(10000);  // Wait for 10 seconds before checking again
@@ -43,7 +47,7 @@ public class InventoryService extends Thread {
                     System.out.println("[InventoryService] Checking Product: " + product.getName() +
                             " | Code: " + productCode + " | Current Stock: " + currentQty);
 
-                    if (currentQty <= warehouseManager.getMinOrderQty()) {
+                    if (currentQty < warehouseManager.getMinOrderQty()) {
                         // Log reordering action
                         System.out.println("[InventoryService] Stock for product " + product.getName() + " (" + productCode +
                                 ") is below minimum threshold (" + warehouseManager.getMinOrderQty() + "). Reordering...");

@@ -12,87 +12,72 @@ import java.util.Random;
 public class Retailer extends User{
     private String retailerId;
     private List<WarehouseManager> warehouseManagers;
-    private List<Product> products;
-    public HashMap<String, Integer> quantityMap;
     private int minOrderQty;
 
      public Retailer(List<WarehouseManager> warehouseManagers, int minOrderQty, List<Product> products) {
         this.warehouseManagers = warehouseManagers;
         this.minOrderQty = minOrderQty;
-        this.products = products;
-        this.quantityMap = new HashMap<>();
+
 
     }
 
      
 
 
-    public void buyStock(Product product, int desiredQty){
+    public boolean buyStock(Product product, int desiredQty){
         String code = product.getCode();
-        Integer current = quantityMap.getOrDefault(code, 0);
+        System.out.println("INSIDE RETAILER BUY STOCK");
+//        Integer current = quantityMap.get(code);
 
-        if (current > minOrderQty) {
-            System.out.println("Retailer stock for " + code + " (" + current +
-                    ") above threshold (" + minOrderQty + "). No reorder.");
-            return;
-        }
+//        if (current > minOrderQty) {
+//            System.out.println("Retailer stock for " + code + " (" + current +
+//                    ") above threshold (" + minOrderQty + "). No reorder.");
+//            return false;
+//        }
 
-
-         
-
-        
-
-        WarehouseManager bestWarehouse = null;
+        WarehouseManager bestWarehouse = this.warehouseManagers.get(0);
         double bestCost = Double.MAX_VALUE;
-        int bestQty = 0;
+
+
 
         for (WarehouseManager wm : warehouseManagers) {
             int stockAvailable = wm.quantityMap.getOrDefault(code, 0);
-            int orderQty = Math.min(desiredQty, stockAvailable);
+            if(stockAvailable < desiredQty){
+                wm.updateDemandHistory(product, desiredQty);
+                return false;
+            }
+            desiredQty = Math.min(desiredQty, stockAvailable);
 
-            if (orderQty == 0) continue;
+            if (desiredQty == 0) continue;
 
             double price = wm.getPrice(code);
-            double cost = price * orderQty;
+            double cost = price * desiredQty;
 
-            if (cost < bestCost && orderQty > 0) {
+            if (cost <= bestCost && desiredQty > 0) {
                 bestCost = cost;
                 bestWarehouse = wm;
-                bestQty = orderQty;
+
             }
         }
 
         if (bestWarehouse == null) {
             System.err.println("No warehouse has available stock for " + code);
-            return;
+            return false;
         }
 
         try{
-            bestWarehouse.sellToRetailer(product, bestQty, this);
-            quantityMap.put(code, current + bestQty);
-            System.out.println("Retailer ordering " + bestQty + " units of " + code + " from warehouse.");
+            bestWarehouse.sellToRetailer(product, desiredQty, this);
+//            quantityMap.put(code, current + bestQty);
+            System.out.println("Retailer ordering " + desiredQty + " units of " + code + " from warehouse.");
+            return true;
         }catch(WarehouseManager.InsufficientStockException e){
             System.err.println("Failed to buy from warehouse: " + e.getMessage());
         }
+        return true;
     }
 
 
-    public void sellToCustomer(Product product, int qty) throws InsufficientStockException {
-        String code = product.getCode();
-        int currentQty = quantityMap.getOrDefault(code, 0);
 
-        if (currentQty < qty) {
-            throw new InsufficientStockException("Retailer: Not enough stock for product: " + code);
-        }
-
-        quantityMap.put(code, currentQty - qty);
-        System.out.println("Sold " + qty + " units of " + code + " to customer.");
-    }
-
-
-    public List<Product> getProducts() {
-        return products;
-    }
 
 
     public static class InsufficientStockException extends Exception {

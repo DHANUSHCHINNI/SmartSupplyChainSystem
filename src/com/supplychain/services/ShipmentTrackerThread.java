@@ -35,7 +35,8 @@ public class ShipmentTrackerThread extends Thread {
                 // write exactly once
                 writeLogEntry(status);
 
-                if (status.equals("Delivered")) {
+
+                if ("Delivered".equals(status)) {
                     shutdown();
                     break;
                 }

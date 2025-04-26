@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import com.supplychain.services.ShipmentTrackerThread;
 import com.supplychain.services.Trackable;
 import com.supplychain.models.Order;
+import com.supplychain.forecasts.DemandForecastService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -21,10 +22,10 @@ public class WarehouseManager extends User{
     private List<Product> products;
     public HashMap<String, Integer> quantityMap; //code, quantity
     private Map<String, Double> priceMap;
+    private DemandForecastService predictionModel;
     private HashMap<String, List<Integer>> demandHistory;
     public WarehouseManager(List<Supplier> suppliers, int minOrderQty, List<Product> products){
-        inventoryService=new InventoryService(this);
-        inventoryService.start();
+        this.predictionModel=new DemandForecastService(this);
         this.suppliers=suppliers;
         this.products=products;
         this.minOrderQty=minOrderQty;
@@ -32,6 +33,13 @@ public class WarehouseManager extends User{
         this.priceMap = new HashMap<>();
         Random r=new Random();
         this.demandHistory=new HashMap<String, List<Integer>>();
+        for (Product p : products) {
+            quantityMap.put(p.getCode(), 0); // Initialize each product with 0 quantity
+            priceMap.put(p.getCode(), Double.MAX_VALUE); // Default price if not set
+        }
+
+        inventoryService=new InventoryService(this);
+        inventoryService.start();
     }
     public List<Product> getProducts() {
         return products;
@@ -40,11 +48,42 @@ public class WarehouseManager extends User{
     public InventoryService getInventoryService(){
         return this.inventoryService;
     }
+    public void addQty(Product p, int q) {
+        System.out.println("Adding quantity " + q + " to product " + p.getName());
+        // Check if the product code already exists in the map
+        if (this.quantityMap.containsKey(p.getCode())) {
+            // If it exists, increment the existing quantity by q
+            this.quantityMap.put(p.getCode(), this.quantityMap.get(p.getCode()) + q);
+        } else {
+            // If not, add the product code with the specified quantity
+            this.quantityMap.put(p.getCode(), q);
+        }
+    }
+
+    public void updateMinOrderQty() {
+        List<Integer> allDemands = new ArrayList<>();
+
+        for (List<Integer> demands : demandHistory.values()) {
+            allDemands.addAll(demands);
+        }
+
+        if (allDemands.isEmpty()) {
+            return; // or some default value if there's no demand history
+        }
+
+        int sum = 0;
+        for (int demand : allDemands) {
+            sum += demand;
+        }
+
+        this.minOrderQty = sum / allDemands.size(); // Integer division: average
+        System.out.println("Updated Minimum Order quantity to: " + this.minOrderQty);
+    }
     public void buyStock(Product product, int desiredQty) {
         String code = product.getCode();
         Integer current = quantityMap.getOrDefault(code, 0);
 
-        if (current > minOrderQty) {
+        if (current >= minOrderQty) {
             System.out.println("Stock for " + code + " (" + current +
                     ") above threshold (" + minOrderQty + "). No reorder.");
             return;
@@ -52,7 +91,8 @@ public class WarehouseManager extends User{
 
         Supplier bestSupplier = null;
         double bestCost = Double.MAX_VALUE;
-        int bestQty = 0;
+        int bestQty = predictionModel.predict(product);
+        System.out.println("Placing order for predicted value: ");
 
         for (Supplier s : suppliers) {
             int supplierMax = s.getMaxOrderQuantity(code);
@@ -76,7 +116,7 @@ public class WarehouseManager extends User{
         try {
 
             // Create the order (this also handles sleep and shipment.log updates)
-            Order order = new Order(bestSupplier,this);
+            Order order = new Order(bestSupplier,this, product, bestQty);
 
             ShipmentTrackerThread shipmentTracker= new ShipmentTrackerThread(order.getOrderID(), 2, order);
             shipmentTracker.start();
@@ -103,17 +143,23 @@ public class WarehouseManager extends User{
         quantityMap.put(code, current + bestQty);
     }
 
+    public void updateDemandHistory(Product product, int qty){
+        this.demandHistory.computeIfAbsent(product.getCode(), k -> new ArrayList<>()).add(qty);
+        updateMinOrderQty();
+    }
     public void sellToRetailer(Product product, int qty, Retailer retailer) throws InsufficientStockException {
         String code = product.getCode();
+        this.updateDemandHistory(product, qty);
+
         int currentQty = quantityMap.getOrDefault(code, 0);
 
 
         if (currentQty < qty) {
             throw new InsufficientStockException("Not enough stock for product: " + code);
         }
-        demandHistory.putIfAbsent(code, new ArrayList<>());
+
         List<Integer> productHistory = demandHistory.get(code);
-        productHistory.add(qty);
+
 
         quantityMap.put(code, currentQty - qty);
     }
@@ -142,6 +188,11 @@ public class WarehouseManager extends User{
 
     public HashMap<String, List<Integer>> getDemandHistory(){
         return this.demandHistory;
+    }
+
+    public List<Integer> getProductDemandHistory(Product p){
+        List<Integer> productHistory=this.demandHistory.get(p.getCode());
+        return productHistory;
     }
    
 
