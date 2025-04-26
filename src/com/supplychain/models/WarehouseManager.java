@@ -20,6 +20,7 @@ public class WarehouseManager extends User{
     private int MAX_QUANTITY;
     private List<Product> products;
     public HashMap<String, Integer> quantityMap; //code, quantity
+    private final Map<String, Double> priceMap; 
     public WarehouseManager(List<Supplier> suppliers, int minOrderQty, List<Product> products){
         inventoryService=new InventoryService(this);
         inventoryService.start();
@@ -27,6 +28,7 @@ public class WarehouseManager extends User{
         this.products=products;
         this.minOrderQty=minOrderQty;
         this.quantityMap = new HashMap<>();
+        this.priceMap = new HashMap<>();
         Random r=new Random();
     }
     public List<Product> getProducts() {
@@ -116,5 +118,11 @@ public class WarehouseManager extends User{
     public int getMaxQuantity() {
         return MAX_QUANTITY;
     }
+
+    public double getPrice(String productCode) {
+        return priceMap.getOrDefault(productCode, Double.MAX_VALUE);
+    }
+
+   
 
 }
