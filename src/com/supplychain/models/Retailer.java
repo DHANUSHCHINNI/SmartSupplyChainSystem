@@ -42,7 +42,7 @@ public class Retailer extends User{
 
         
 
-        WarehouseManager bestWarehouseManager = null;
+        WarehouseManager bestWarehouse = null;
         double bestCost = Double.MAX_VALUE;
         int bestQty = 0;
 
